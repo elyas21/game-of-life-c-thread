@@ -1,0 +1,22 @@
+There are two type of shared memory  machines
+1 symetric multia process
+  every processor element have equal fitting as far as oprating system.
+  it assume no special memory block of meomory, all memorys are equaly acesseble on same cost from anywary from the machine.
+
+2, Non Nniform Address Space Multiprocessor(NUMA)
+  different region hase different acess cost.
+
+
+
+
+Race Conditon:
+when the program outcomes change when they schedule differently
+
+forkJoin model:
+master thread had ID 0;
+
+  program start as single thread
+  when parallazim is need it create block of thread (team of threads);
+when they finish thire work they join back to master thread;
+  we can nest thread;
+  

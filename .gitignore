@@ -1,0 +1,44 @@
+# Compiler output
+*.out
+*.o
+*.a
+*.so
+*.exe
+*.dll
+*.elf
+*.obj
+*.lib
+
+# Temporary files
+*~
+*.bak
+*.swp
+*.swo
+*.swp.*
+*.log
+
+# IDE and editor-specific files
+.vscode/
+.idea/
+*.iml
+
+# Mac system files
+.DS_Store
+
+# Windows system files
+Thumbs.db
+Desktop.ini
+
+# CMake build directory
+/build/
+
+# Visual Studio Code workspace files
+.vscode/*
+
+# Other common files
+*.depend
+*.d
+
+
+# coustom
+/test/

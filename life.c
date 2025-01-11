@@ -13,6 +13,7 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
+#include <time.h>
 
 #define MATCH(s) (!strcmp(argv[ac], (s)))
 
@@ -36,6 +37,10 @@ extern FILE *gnu;
 
 int main(int argc,char **argv)
 {
+    struct timespec start, end;
+    
+    // Get start time
+    clock_gettime(CLOCK_MONOTONIC, &start);
     int i,j,ac;
 
     /* Set default input parameters */
@@ -178,6 +183,12 @@ int main(int argc,char **argv)
     /* Free resources */
     free(nextWorld);
     free(currWorld);
-
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    
+    // Calculate time difference in seconds and nanoseconds
+    double elapsed_time = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+    
+    printf("Execution time: %f seconds\n", elapsed_time);
     return(0);
 }
+
