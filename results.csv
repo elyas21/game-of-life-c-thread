@@ -1,0 +1,10 @@
+Threads,Time_life,Time_pthread_life,Time_openmp_life
+life,1,.002864457
+pthread_life,1,7.228255337
+pthread_life,2,6.230672205
+pthread_life,4,9.440728405
+pthread_life,8,5.457179706
+openmp_life,1,.016900025
+openmp_life,2,.016895446
+openmp_life,4,.017863153
+openmp_life,8,.019658605
