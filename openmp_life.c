@@ -2,10 +2,12 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+#include <time.h>
 #include <string.h>
 #include <omp.h>
+#include <unistd.h> // For getopt
 
-#define MATCH(s) (!strcmp(argv[ac], (s)))
+#define MATCH(s) (!strcmp(optarg, (s)))
 
 int MeshPlot(int t, int m, int n, char **mesh);
 double real_rand();
@@ -14,37 +16,55 @@ double getTime();
 extern FILE *gnu;
 
 static char **currWorld = NULL, **nextWorld = NULL, **tmesh = NULL;
-static int maxiter = 200; /* number of iteration timesteps */
-static int population[2] = {0, 0}; /* number of live cells */
+static int maxiter = 200;
+static int population[2] = {0, 0};
+static int nx = 100;
+static int ny = 100;
 
-int nx = 100; /* number of mesh points in the x dimension */
-int ny = 100; /* number of mesh points in the y dimension */
+void saveResult(const char *codetype, int nx, int ny, int maxiter, float prob, long seedVal, int numthreads, double elapsed_time) {
+    FILE *fp;
+    fp = fopen("results.csv", "a");
+    if (fp == NULL) {
+        perror("Error opening file!");
+        return;
+    }
+    fseek(fp, 0, SEEK_END);
+    if (ftell(fp) == 0) {
+        fprintf(fp, "codetype,nx,ny,maxiter,prob,seedVal,numthreads,elapsed_time\n");
+    }
+    fprintf(fp, "%s,%d,%d,%d,%.2f,%ld,%d,%f\n", codetype, nx, ny, maxiter, prob, seedVal, numthreads, elapsed_time);
+    fclose(fp);
+}
 
 int main(int argc, char **argv) {
-  double start_time, end_time;
-    
+    double start_time, end_time;
     start_time = omp_get_wtime();
-    int i, j, ac, t;
-    float prob = 0.5; /* Probability of placing a cell */
-    long seedVal = 0;
+
+    int i, j, t;
+    float prob = 0.5;
+    long seedVal = time(NULL); // Default seed
     int game = 0;
     int s_step = 0;
     int numthreads = 1;
     int disable_display = 0;
+    int opt;
 
-    /* Over-ride with command-line input parameters (if any) */
-    for (ac = 1; ac < argc; ac++) {
-        if (MATCH("-n")) { nx = atoi(argv[++ac]); }
-        else if (MATCH("-i")) { maxiter = atoi(argv[++ac]); }
-        else if (MATCH("-t")) { numthreads = atoi(argv[++ac]); }
-        else if (MATCH("-p")) { prob = atof(argv[++ac]); }
-        else if (MATCH("-s")) { seedVal = atol(argv[++ac]); }
-        else if (MATCH("-step")) { s_step = 1; }
-        else if (MATCH("-d")) { disable_display = 1; }
-        else if (MATCH("-g")) { game = atoi(argv[++ac]); }
-        else {
-            printf("Usage: %s [-n < meshpoints>] [-i <iterations>] [-s seed] [-p prob] [-t numthreads] [-step] [-g <game #>] [-d]\n", argv[0]);
-            return (-1);
+    // Use getopt for argument parsing
+    while ((opt = getopt(argc, argv, "n:i:t:p:s:dg:h")) != -1) {
+        switch (opt) {
+            case 'n': nx = atoi(optarg); break;
+            case 'i': maxiter = atoi(optarg); break;
+            case 't': numthreads = atoi(optarg); break;
+            case 'p': prob = atof(optarg); break;
+            case 's': seedVal = atol(optarg); break;
+            case 'd': disable_display = 1; break;
+            case 'g': game = atoi(optarg); break;
+            case 'h':
+                printf("Usage: %s -n <meshpoints> -i <iterations> -t <numthreads> -p <prob> -s <seed> [-d] [-g <game #>] [-h]\n", argv[0]);
+                return 0;
+            default:
+                fprintf(stderr, "Usage: %s -n <meshpoints> -i <iterations> -t <numthreads> -p <prob> -s <seed> [-d] [-g <game #>] [-h]\n", argv[0]);
+                return 1;
         }
     }
 
@@ -52,14 +72,20 @@ int main(int argc, char **argv) {
     nx = nx + 2;
     ny = nx;
 
-    /* Allocate memory for worlds */
     currWorld = (char **)malloc(sizeof(char *) * nx + sizeof(char) * nx * ny);
+    if (currWorld == NULL) {
+        perror("Memory allocation failed");
+        return 1;
+    }
     for (i = 0; i < nx; i++) currWorld[i] = (char *)(currWorld + nx) + i * ny;
 
     nextWorld = (char **)malloc(sizeof(char *) * nx + sizeof(char) * nx * ny);
+        if (nextWorld == NULL) {
+        perror("Memory allocation failed");
+        return 1;
+    }
     for (i = 0; i < nx; i++) nextWorld[i] = (char *)(nextWorld + nx) + i * ny;
 
-    /* Set boundary cells to '0' */
     for (i = 0; i < nx; i++) {
         currWorld[i][0] = 0;
         currWorld[i][ny - 1] = 0;
@@ -73,7 +99,6 @@ int main(int argc, char **argv) {
         nextWorld[nx - 1][i] = 0;
     }
 
-    // Random or predefined game state
     if (game == 0) {
         for (i = 1; i < nx - 1; i++)
             for (j = 1; j < ny - 1; j++) {
@@ -89,13 +114,11 @@ int main(int argc, char **argv) {
 
     double t0 = getTime();
 
-    /* Parallel loop for generations */
     for (t = 0; t < maxiter && population[1]; t++) {
         population[0] = 0;
-        #pragma omp parallel shared(currWorld, nextWorld, population)
+#pragma omp parallel shared(currWorld, nextWorld, population)
         {
-            /* Parallel cell update */
-            #pragma omp for collapse(2)
+#pragma omp for collapse(2)
             for (i = 1; i < nx - 1; i++) {
                 for (j = 1; j < ny - 1; j++) {
                     int nn = currWorld[i + 1][j] + currWorld[i - 1][j] +
@@ -104,12 +127,11 @@ int main(int argc, char **argv) {
                              currWorld[i - 1][j + 1] + currWorld[i + 1][j - 1];
 
                     nextWorld[i][j] = currWorld[i][j] ? (nn == 2 || nn == 3) : (nn == 3);
-                    #pragma omp atomic
+#pragma omp atomic
                     population[0] += nextWorld[i][j];
                 }
             }
-            /* Synchronize cell update and display */
-            #pragma omp single
+#pragma omp single
             {
                 tmesh = nextWorld;
                 nextWorld = currWorld;
@@ -129,17 +151,16 @@ int main(int argc, char **argv) {
 
     double t1 = getTime();
     printf("Running time: %f sec.\n", t1 - t0);
-    printf("Press enter to end.\n");
-    getchar();
 
     if (gnu != NULL)
         pclose(gnu);
 
     free(nextWorld);
     free(currWorld);
-    end_time = omp_get_wtime();  // End time
-    
+
+    end_time = omp_get_wtime();
     printf("Execution time: %f seconds\n", end_time - start_time);
+    saveResult("openmp", nx, ny, maxiter, prob, seedVal, numthreads, end_time - start_time);
+
     return 0;
 }
-
